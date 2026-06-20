@@ -5,33 +5,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>采购管理 - 后厨物料系统</title>
 <link rel="stylesheet" href="/style.css">
+<style>
+.flex-between{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.copy-toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a6b4e;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;z-index:100;opacity:0;transition:opacity .3s}
+.copy-toast.show{opacity:1}
+.btn-copy{background:#f0efea;border-color:#d0d0c8;color:#444}
+.btn-copy:hover{background:#e4e3dc}
+.btn-restore{background:#e8f4e8;border-color:#b8d8b8;color:#2d6a2d}
+.btn-restore:hover{background:#d8eed8}
+</style>
 </head>
 <body>
-
 <header>
   <h1>🥩 后厨物料采购系统</h1>
-  <nav>
-    <a href="/chef">厨师端</a>
-    <a href="/">采购端</a>
-  </nav>
+  <nav><a href="/chef">厨师端</a><a href="/">采购端</a></nav>
 </header>
-
 <div class="container">
   <div class="filters">
     <button data-filter="all" class="active">全部</button>
     <button data-filter="pending">待采购</button>
     <button data-filter="purchased">已采购</button>
+    <button data-filter="deleted" style="color:#888">\ud83d\uddd1 回收站</button>
     <span style="flex:1"></span>
     <span id="countBadge" style="font-size:13px;color:#888;padding:6px 0"></span>
+    <button id="copyAllBtn" class="btn btn-sm btn-copy" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> 复制清单</button>
   </div>
-
-  <div class="table-wrap">
+  <div class="table-wrap" id="mainTable">
     <table>
       <thead>
         <tr>
           <th>厨师</th>
           <th>物料</th>
           <th>数量</th>
+          <th>采购日期</th>
           <th>备注</th>
           <th>提交时间</th>
           <th>状态</th>
@@ -43,109 +49,44 @@
     <div id="empty" class="empty" style="display:none">暂无数据</div>
   </div>
 </div>
-
 <div id="toast" class="toast"></div>
-
+<div id="copyToast" class="copy-toast">\u2705 已复制到剪贴板</div>
 <script>
-let currentFilter = 'all';
-
+var currentFilter = 'all';
+function todayStr(){var d=new Date();var p=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
 async function loadOrders() {
-  const params = new URLSearchParams();
-  if (currentFilter !== 'all') params.set('status', currentFilter);
-  const res = await fetch('/api/orders?' + params);
-  return res.json();
+  var params=new URLSearchParams();
+  if(currentFilter==='deleted')params.set('status','deleted');
+  else if(currentFilter!=='all')params.set('status',currentFilter);
+  var r=await fetch('/api/orders?'+params);return r.json();
 }
-
+function fmtDate(s){return s?s.split(' ')[0]||s:'<span style="color:#ccc">\u2014</span>';}
 function render(orders) {
-  const tbody = document.getElementById('orderList');
-  const empty = document.getElementById('empty');
-
-  if (orders.length === 0) {
-    tbody.innerHTML = '';
-    empty.style.display = 'block';
-    document.getElementById('countBadge').textContent = '';
-    return;
-  }
-  empty.style.display = 'none';
-
-  const total = orders.length;
-  const pending = orders.filter(o => o.status === 'pending').length;
-  document.getElementById('countBadge').textContent = `${total} 条记录` + (pending > 0 ? `，${pending} 条待采购` : '');
-
-  tbody.innerHTML = orders.map(o => {
-    const statusBadge = o.status === 'pending'
-      ? '<span class="badge pending">待采购</span>'
-      : '<span class="badge purchased">已采购</span>';
-    const purchaseBtn = o.status === 'pending'
-      ? `<button class="btn btn-sm btn-primary" onclick="markPurchased(${o.id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> 已采购</button>`
-      : '';
-    return `<tr>
-      <td><strong>${esc(o.chef)}</strong></td>
-      <td>${esc(o.item)}</td>
-      <td>${o.quantity} ${esc(o.unit)}</td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.note ? esc(o.note) : '<span style="color:#ccc">—</span>'}</td>
-      <td>${o.created_at}</td>
-      <td>${statusBadge}</td>
-      <td><div class="actions">${purchaseBtn}<button class="btn btn-sm btn-danger" onclick="deleteOrder(${o.id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 删除</button></div></td>
-    </tr>`;
+  var tb=document.getElementById('orderList'),empty=document.getElementById('empty'),isRecycle=currentFilter==='deleted',cab=document.getElementById('copyAllBtn');
+  if(orders.length===0){tb.innerHTML='';empty.style.display='block';document.getElementById('countBadge').textContent='';cab.style.display='none';return;}
+  empty.style.display='none';
+  if(isRecycle){document.getElementById('countBadge').textContent=orders.length+' 条已删除记录';cab.style.display='none';}
+  else{var t=orders.length,p=orders.filter(function(o){return o.status==='pending';}).length;document.getElementById('countBadge').textContent=t+' 条记录'+(p>0?'，'+p+' 条待采购':'');cab.style.display=t>0?'inline-flex':'none';}
+  tb.innerHTML=orders.map(function(o){
+    if(isRecycle) return '<tr style="color:#999"><td><strong>'+esc(o.chef)+'</strong></td><td>'+esc(o.item)+'</td><td>'+o.quantity+' '+esc(o.unit)+'</td><td>'+fmtDate(o.delivery_date)+'</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(o.note?esc(o.note):'<span style="color:#ccc">\u2014</span>')+'</td><td>'+o.created_at+'</td><td><span class="badge" style="background:#eee;color:#666">已删除</span></td><td><div class="actions"><button class="btn btn-sm btn-restore" onclick="restoreOrder('+o.id+')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> 恢复</button></div></td></tr>';
+    var sb=o.status==='pending'?'<span class="badge pending">待采购</span>':'<span class="badge purchased">已采购</span>';
+    var pb=o.status==='pending'?'<button class="btn btn-sm btn-primary" onclick="markPurchased('+o.id+')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> 已采购</button>':'';
+    return '<tr><td><strong>'+esc(o.chef)+'</strong></td><td>'+esc(o.item)+'</td><td>'+o.quantity+' '+esc(o.unit)+'</td><td>'+fmtDate(o.delivery_date)+'</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(o.note?esc(o.note):'<span style="color:#ccc">\u2014</span>')+'</td><td>'+o.created_at+'</td><td>'+sb+'</td><td><div class="actions">'+pb+'<button class="btn btn-sm btn-copy" onclick="copyOrder('+o.id+')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> 复制</button><button class="btn btn-sm btn-danger" onclick="deleteOrder('+o.id+')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 删除</button></div></td></tr>';
   }).join('');
 }
-
-async function refresh() {
-  const orders = await loadOrders();
-  render(orders);
-}
-
-async function markPurchased(id) {
-  try {
-    const res = await fetch('/api/orders/' + id + '/purchase', { method: 'PATCH' });
-    if (!res.ok) throw new Error('操作失败');
-    showToast('✅ 已标记为已采购', 'success');
-    refresh();
-  } catch (e) {
-    showToast('❌ ' + e.message, 'error');
-  }
-}
-
-async function deleteOrder(id) {
-  if (!confirm('确定要删除这条记录吗？')) return;
-  try {
-    await fetch('/api/orders/' + id, { method: 'DELETE' });
-    showToast('已删除', 'success');
-    refresh();
-  } catch (e) {
-    showToast('❌ ' + e.message, 'error');
-  }
-}
-
-function showToast(msg, type) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast ' + type + ' show';
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
-}
-
-function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-/* ---- 筛选按钮 ---- */
-document.querySelectorAll('.filters button[data-filter]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.filters button[data-filter]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentFilter = btn.dataset.filter;
-    refresh();
-  });
-});
-
-/* ---- 自动刷新 ---- */
+async function refresh(){var o=await loadOrders();render(o);}
+async function markPurchased(id){try{var r=await fetch('/api/orders/'+id+'/purchase',{method:'PATCH'});if(!r.ok)throw new Error('操作失败');showToast('\u2705 已标记为已采购','success');refresh();}catch(e){showToast('\u274c '+e.message,'error');}}
+async function deleteOrder(id){if(!confirm('确定要删除吗？（可回收站恢复）'))return;try{await fetch('/api/orders/'+id,{method:'DELETE'});showToast('已移入回收站','success');refresh();}catch(e){showToast('\u274c '+e.message,'error');}}
+async function restoreOrder(id){try{var r=await fetch('/api/orders/'+id+'/restore',{method:'PATCH'});if(!r.ok)throw new Error('恢复失败');showToast('\u2705 已恢复','success');refresh();}catch(e){showToast('\u274c '+e.message,'error');}}
+async function copyOrder(id){try{var orders=await loadOrders();var o=orders.find(function(x){return x.id===id;});if(!o)return;var text=o.chef+' - '+o.item+' \u00d7'+o.quantity+o.unit;if(o.delivery_date)text+='（'+o.delivery_date+'到）';if(o.note)text+=' - '+o.note;await navigator.clipboard.writeText(text);showCopyToast();}catch(e){showToast('\u274c 复制失败','error');}}
+async function copyAllOrders(){try{var orders=await loadOrders();if(orders.length===0)return;var lines=orders.map(function(o,i){var l=(i+1)+'. '+o.chef+' - '+o.item+' \u00d7 '+o.quantity+o.unit;if(o.delivery_date)l+='（'+o.delivery_date+'到）';if(o.note)l+=' - 备注：'+o.note;l+=o.status==='pending'?' \u23f3待采购':' \u2705已采购';return l;});var text=todayStr()+' 采购清单\n'+'='.repeat(20)+'\n'+lines.join('\n')+'\n'+'='.repeat(20)+'\n共 '+orders.length+' 项';await navigator.clipboard.writeText(text);showCopyToast();}catch(e){showToast('\u274c 复制失败','error');}}
+function showToast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className='toast '+type+' show';clearTimeout(t._timer);t._timer=setTimeout(function(){t.classList.remove('show');},2500);}
+function showCopyToast(){var t=document.getElementById('copyToast');t.className='copy-toast show';clearTimeout(t._timer);t._timer=setTimeout(function(){t.classList.remove('show');},2000);}
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+document.querySelectorAll('.filters button[data-filter]').forEach(function(b){b.addEventListener('click',function(){document.querySelectorAll('.filters button[data-filter]').forEach(function(x){x.classList.remove('active');});b.classList.add('active');currentFilter=b.dataset.filter;refresh();});});
+document.getElementById('copyAllBtn').addEventListener('click',copyAllOrders);
 refresh();
-setInterval(refresh, 10000);
+setInterval(refresh,10000);
 </script>
-
 </body>
 </html>
