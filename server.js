@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const { getDb } = require('./database');
+const { load, save, getNextId, nowStr } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -9,61 +9,51 @@ const HOST = process.env.HOST || '0.0.0.0';
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-/* ---- API ---- */
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    res.setHeader('Cache-Control', 'no-store');
+  }
+  next();
+});
 
-// 提交采购需求
 app.post('/api/orders', (req, res) => {
   const { chef, item, quantity, unit, note } = req.body;
   if (!chef || !item || quantity == null) {
     return res.status(400).json({ error: 'chef, item, quantity 为必填' });
   }
-  const db = getDb();
-  const stmt = db.prepare(
-    `INSERT INTO orders (chef, item, quantity, unit, note) VALUES (?, ?, ?, ?, ?)`
-  );
-  const result = stmt.run(chef, item, quantity, unit || '份', note || '');
-  res.status(201).json({ id: result.lastInsertRowid });
+  const orders = load();
+  const id = getNextId();
+  orders.push({ id, chef, item, quantity: parseFloat(quantity), unit: unit || '份', note: note || '', status: 'pending', created_at: nowStr(), purchased_at: null });
+  save();
+  res.status(201).json({ id });
 });
 
-// 获取采购清单（可按状态筛选）
 app.get('/api/orders', (req, res) => {
-  const db = getDb();
+  let orders = load();
   const { status, chef } = req.query;
-  let sql = 'SELECT * FROM orders WHERE 1=1';
-  const params = [];
-  if (status) {
-    sql += ' AND status = ?';
-    params.push(status);
-  }
-  if (chef) {
-    sql += ' AND chef = ?';
-    params.push(chef);
-  }
-  sql += ' ORDER BY created_at DESC';
-  const rows = db.prepare(sql).all(...params);
-  res.json(rows);
+  if (status) orders = orders.filter(o => o.status === status);
+  if (chef) orders = orders.filter(o => o.chef === chef);
+  orders.sort((a, b) => b.id - a.id);
+  res.json(orders);
 });
 
-// 标记为已采购
 app.patch('/api/orders/:id/purchase', (req, res) => {
-  const db = getDb();
-  const result = db.prepare(
-    `UPDATE orders SET status = 'purchased', purchased_at = datetime('now','localtime') WHERE id = ? AND status = 'pending'`
-  ).run(req.params.id);
-  if (result.changes === 0) {
+  const orders = load();
+  const idx = orders.findIndex(o => o.id === parseInt(req.params.id));
+  if (idx === -1 || orders[idx].status !== 'pending') {
     return res.status(404).json({ error: '未找到待采购订单或已采购' });
   }
+  orders[idx].status = 'purchased';
+  orders[idx].purchased_at = nowStr();
+  save();
   res.json({ ok: true });
 });
 
-// 删除订单
 app.delete('/api/orders/:id', (req, res) => {
-  const db = getDb();
-  db.prepare('DELETE FROM orders WHERE id = ?').run(req.params.id);
+  const orders = load();
+  save(orders.filter(o => o.id !== parseInt(req.params.id)));
   res.json({ ok: true });
 });
-
-/* ---- 前端路由 ---- */
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -74,7 +64,7 @@ app.get('/chef', (req, res) => {
 });
 
 app.listen(PORT, HOST, () => {
-  console.log(`采购系统已启动 → http://${HOST}:${PORT}`);
-  console.log(`  - 采购端: http://localhost:${PORT}/`);
-  console.log(`  - 厨师端: http://localhost:${PORT}/chef`);
+  console.log('采购系统已启动 → http://' + HOST + ':' + PORT);
+  console.log('  - 采购端: http://localhost:' + PORT + '/');
+  console.log('  - 厨师端: http://localhost:' + PORT + '/chef');
 });
