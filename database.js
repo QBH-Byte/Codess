@@ -1,34 +1,30 @@
-const Database = require('fs');
+const fs = require('fs');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, 'orders.db');
+const DB_PATH = path.join(__dirname, 'orders.json');
+let data = null;
 
-let db;
-
-function getDb() {
-  if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-    initSchema();
-  }
-  return db;
+function load() {
+  if (data) return data;
+  try { data = JSON.parse(fs.readFileSync(DB_PATH, 'utf8')); }
+  catch { data = []; }
+  return data;
 }
 
-function initSchema() {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS orders (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      chef TEXT NOT NULL,
-      item TEXT NOT NULL,
-      quantity REAL NOT NULL,
-      unit TEXT NOT NULL DEFAULT '份',
-      note TEXT DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','purchased')),
-      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-      purchased_at TEXT
-    )
-  `);
+function save(d) {
+  if (d !== undefined) data = d;
+  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
 }
 
-module.exports = { getDb };
+function getNextId() {
+  load();
+  return data.length > 0 ? Math.max(...data.map(o => o.id)) + 1 : 1;
+}
+
+function nowStr() {
+  var d = new Date();
+  var p = function(n) { return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+
+module.exports = { load, save, getNextId, nowStr };
