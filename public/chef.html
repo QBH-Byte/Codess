@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>提交采购需求 - 后厨物料系统</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header>
+  <h1>🥩 后厨物料采购系统</h1>
+  <nav>
+    <a href="/chef">厨师端</a>
+    <a href="/">采购端</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="form-card">
+    <h2>📝 提报采购需求</h2>
+    <form id="orderForm">
+      <div class="form-group">
+        <label for="chef">你的名字</label>
+        <input type="text" id="chef" placeholder="例如：张师傅" required>
+      </div>
+      <div class="form-group">
+        <label for="item">物料名称</label>
+        <input type="text" id="item" placeholder="例如：三黄鸡、西兰花" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="quantity">数量</label>
+          <input type="number" id="quantity" step="0.1" min="0.1" required>
+        </div>
+        <div class="form-group">
+          <label for="unit">单位</label>
+          <select id="unit">
+            <option value="斤">斤</option>
+            <option value="份">份</option>
+            <option value="箱">箱</option>
+            <option value="袋">袋</option>
+            <option value="瓶">瓶</option>
+            <option value="包">包</option>
+            <option value="根">根</option>
+            <option value="个">个</option>
+            <option value="千克">千克</option>
+            <option value="升">升</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="note">备注（可选）</label>
+        <textarea id="note" placeholder="例如：要冰鲜的、不要切好的"></textarea>
+      </div>
+      <button type="submit" class="btn-submit">提交需求</button>
+    </form>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+document.getElementById('orderForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = e.target.querySelector('.btn-submit');
+  btn.disabled = true;
+  btn.textContent = '提交中...';
+
+  try {
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chef: document.getElementById('chef').value.trim(),
+        item: document.getElementById('item').value.trim(),
+        quantity: parseFloat(document.getElementById('quantity').value),
+        unit: document.getElementById('unit').value,
+        note: document.getElementById('note').value.trim()
+      })
+    });
+    if (!res.ok) throw new Error('提交失败');
+    showToast('✅ 提交成功！', 'success');
+    e.target.reset();
+  } catch (err) {
+    showToast('❌ ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '提交需求';
+  }
+});
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+
+</body>
+</html>
