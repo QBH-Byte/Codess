@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>采购管理 - 后厨物料系统</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header>
+  <h1>🥩 后厨物料采购系统</h1>
+  <nav>
+    <a href="/chef">厨师端</a>
+    <a href="/">采购端</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="filters">
+    <button data-filter="all" class="active">全部</button>
+    <button data-filter="pending">待采购</button>
+    <button data-filter="purchased">已采购</button>
+    <span style="flex:1"></span>
+    <span id="countBadge" style="font-size:13px;color:#888;padding:6px 0"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>厨师</th>
+          <th>物料</th>
+          <th>数量</th>
+          <th>备注</th>
+          <th>提交时间</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="orderList"></tbody>
+    </table>
+    <div id="empty" class="empty" style="display:none">暂无数据</div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+let currentFilter = 'all';
+
+async function loadOrders() {
+  const params = new URLSearchParams();
+  if (currentFilter !== 'all') params.set('status', currentFilter);
+  const res = await fetch('/api/orders?' + params);
+  return res.json();
+}
+
+function render(orders) {
+  const tbody = document.getElementById('orderList');
+  const empty = document.getElementById('empty');
+
+  if (orders.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    document.getElementById('countBadge').textContent = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const total = orders.length;
+  const pending = orders.filter(o => o.status === 'pending').length;
+  document.getElementById('countBadge').textContent = `${total} 条记录` + (pending > 0 ? `，${pending} 条待采购` : '');
+
+  tbody.innerHTML = orders.map(o => {
+    const statusBadge = o.status === 'pending'
+      ? '<span class="badge pending">待采购</span>'
+      : '<span class="badge purchased">已采购</span>';
+    const purchaseBtn = o.status === 'pending'
+      ? `<button class="btn btn-sm btn-primary" onclick="markPurchased(${o.id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> 已采购</button>`
+      : '';
+    return `<tr>
+      <td><strong>${esc(o.chef)}</strong></td>
+      <td>${esc(o.item)}</td>
+      <td>${o.quantity} ${esc(o.unit)}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.note ? esc(o.note) : '<span style="color:#ccc">—</span>'}</td>
+      <td>${o.created_at}</td>
+      <td>${statusBadge}</td>
+      <td><div class="actions">${purchaseBtn}<button class="btn btn-sm btn-danger" onclick="deleteOrder(${o.id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 删除</button></div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function refresh() {
+  const orders = await loadOrders();
+  render(orders);
+}
+
+async function markPurchased(id) {
+  try {
+    const res = await fetch('/api/orders/' + id + '/purchase', { method: 'PATCH' });
+    if (!res.ok) throw new Error('操作失败');
+    showToast('✅ 已标记为已采购', 'success');
+    refresh();
+  } catch (e) {
+    showToast('❌ ' + e.message, 'error');
+  }
+}
+
+async function deleteOrder(id) {
+  if (!confirm('确定要删除这条记录吗？')) return;
+  try {
+    await fetch('/api/orders/' + id, { method: 'DELETE' });
+    showToast('已删除', 'success');
+    refresh();
+  } catch (e) {
+    showToast('❌ ' + e.message, 'error');
+  }
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/* ---- 筛选按钮 ---- */
+document.querySelectorAll('.filters button[data-filter]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filters button[data-filter]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    refresh();
+  });
+});
+
+/* ---- 自动刷新 ---- */
+refresh();
+setInterval(refresh, 10000);
+</script>
+
+</body>
+</html>
