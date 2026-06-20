@@ -7,7 +7,6 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-
 <header>
   <h1>🥩 后厨物料采购系统</h1>
   <nav>
@@ -15,7 +14,6 @@
     <a href="/">采购端</a>
   </nav>
 </header>
-
 <div class="container">
   <div class="form-card">
     <h2>📝 提报采购需求</h2>
@@ -50,6 +48,10 @@
         </div>
       </div>
       <div class="form-group">
+        <label for="delivery_date">需要日期</label>
+        <input type="date" id="delivery_date">
+      </div>
+      <div class="form-group">
         <label for="note">备注（可选）</label>
         <textarea id="note" placeholder="例如：要冰鲜的、不要切好的"></textarea>
       </div>
@@ -57,18 +59,21 @@
     </form>
   </div>
 </div>
-
 <div id="toast" class="toast"></div>
-
 <script>
-document.getElementById('orderForm').addEventListener('submit', async (e) => {
+function todayStr() {
+  var d = new Date();
+  var p = function(n) { return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+document.getElementById('delivery_date').value = todayStr();
+document.getElementById('orderForm').addEventListener('submit', async function(e) {
   e.preventDefault();
-  const btn = e.target.querySelector('.btn-submit');
+  var btn = e.target.querySelector('.btn-submit');
   btn.disabled = true;
   btn.textContent = '提交中...';
-
   try {
-    const res = await fetch('/api/orders', {
+    var res = await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -76,12 +81,14 @@ document.getElementById('orderForm').addEventListener('submit', async (e) => {
         item: document.getElementById('item').value.trim(),
         quantity: parseFloat(document.getElementById('quantity').value),
         unit: document.getElementById('unit').value,
+        delivery_date: document.getElementById('delivery_date').value,
         note: document.getElementById('note').value.trim()
       })
     });
     if (!res.ok) throw new Error('提交失败');
     showToast('✅ 提交成功！', 'success');
     e.target.reset();
+    document.getElementById('delivery_date').value = todayStr();
   } catch (err) {
     showToast('❌ ' + err.message, 'error');
   } finally {
@@ -89,15 +96,13 @@ document.getElementById('orderForm').addEventListener('submit', async (e) => {
     btn.textContent = '提交需求';
   }
 });
-
 function showToast(msg, type) {
-  const t = document.getElementById('toast');
+  var t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast ' + type + ' show';
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+  t._timer = setTimeout(function() { t.classList.remove('show'); }, 2500);
 }
 </script>
-
 </body>
 </html>
