@@ -1,0 +1,73 @@
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
+
+a{color:#1a6b4e;text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ---- Header ---- */
+header{background:#1a6b4e;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:18px;font-weight:600;letter-spacing:-0.2px}
+header nav a{color:rgba(255,255,255,.85);font-size:14px;margin-left:20px}
+header nav a:hover{color:#fff;text-decoration:none}
+
+/* ---- Layout ---- */
+.container{max-width:1100px;margin:0 auto;padding:20px 24px}
+
+/* ---- Filters ---- */
+.filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.filters button{padding:6px 16px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:13px;color:#444;transition:all .15s}
+.filters button.active{background:#1a6b4e;color:#fff;border-color:#1a6b4e}
+.filters button:hover:not(.active){background:#e8e8e3}
+
+/* ---- Table ---- */
+.table-wrap{background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{background:#f0efea}
+th{padding:10px 12px;text-align:left;font-weight:600;color:#555;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+td{padding:10px 12px;border-top:1px solid #eee}
+tr:hover td{background:#fafaf6}
+
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
+.badge.pending{background:#fff3cd;color:#856404}
+.badge.purchased{background:#d4edda;color:#155724}
+
+td .actions{display:flex;gap:6px}
+.btn{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:5px;border:1px solid #ccc;font-size:12px;cursor:pointer;background:#fff;transition:all .15s}
+.btn-sm{padding:3px 8px;font-size:11px}
+.btn-primary{background:#1a6b4e;color:#fff;border-color:#1a6b4e}
+.btn-primary:hover{background:#155a41}
+.btn-danger{color:#c0392b;border-color:#e8c4c0}
+.btn-danger:hover{background:#fdf0ef}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ---- Empty state ---- */
+.empty{text-align:center;padding:40px 20px;color:#888;font-size:14px}
+
+/* ---- Chef Form ---- */
+.form-card{background:#fff;border-radius:8px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.06);max-width:480px}
+.form-card h2{font-size:16px;margin-bottom:16px;font-weight:600}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:13px;font-weight:500;color:#555;margin-bottom:4px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 10px;border:1px solid #d0d0c8;border-radius:5px;font-size:14px;font-family:inherit;background:#fff;transition:border-color .15s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:#1a6b4e;box-shadow:0 0 0 2px rgba(26,107,78,.12)}
+.form-group textarea{resize:vertical;min-height:60px}
+.form-row{display:flex;gap:10px}
+.form-row .form-group{flex:1}
+.btn-submit{width:100%;padding:10px;background:#1a6b4e;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:500;cursor:pointer;transition:background .15s}
+.btn-submit:hover{background:#155a41}
+
+/* ---- Toast ---- */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:8px;font-size:13px;color:#fff;background:#333;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+.toast.success{background:#1a6b4e}
+.toast.error{background:#c0392b}
+
+/* ---- Responsive ---- */
+@media(max-width:640px){
+  header{padding:12px 16px;flex-wrap:wrap;gap:6px}
+  header h1{font-size:16px}
+  .container{padding:12px 12px}
+  table{font-size:12px}
+  th,td{padding:8px 6px}
+  .form-card{max-width:100%}
+}
