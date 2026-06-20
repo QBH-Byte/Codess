@@ -1,0 +1,13 @@
+﻿{
+  "name": "restaurant-order",
+  "version": "1.0.0",
+  "private": true,
+  "description": "后厨物料采购系统",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "better-sqlite3": "^11.0.0"
+  }
+}
